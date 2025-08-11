@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and user management
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(INSPECTOR)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  inspections Inspection[]
+
+  @@map("users")
+}
+
+// Inspection model for storing inspection data
+model Inspection {
+  id          Int            @id @default(autoincrement())
+  title       String
+  description String?
+  status      InspectionStatus @default(PENDING)
+  location    String?
+  scheduledDate DateTime?
+  completedDate DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  userId      Int
+  user        User           @relation(fields: [userId], references: [id])
+  items       InspectionItem[]
+
+  @@map("inspections")
+}
+
+// Inspection item model for detailed inspection items
+model InspectionItem {
+  id            Int      @id @default(autoincrement())
+  name          String
+  description   String?
+  status        ItemStatus @default(NOT_CHECKED)
+  notes         String?
+  photos        String?  // JSON array of photo URLs
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  inspectionId  Int
+  inspection    Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@map("inspection_items")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  INSPECTOR
+  VIEWER
+}
+
+enum InspectionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ItemStatus {
+  NOT_CHECKED
+  PASSED
+  FAILED
+  NEEDS_ATTENTION
+}

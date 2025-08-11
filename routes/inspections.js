@@ -7,7 +7,7 @@ router.get('/', (req, res) => {
     // TODO: Implement database query
     res.json({
       message: 'Get all inspections',
-      data: []
+      data: [],
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch inspections' });
@@ -21,7 +21,7 @@ router.get('/:id', (req, res) => {
     // TODO: Implement database query
     res.json({
       message: `Get inspection ${id}`,
-      data: { id, status: 'pending' }
+      data: { id, status: 'pending' },
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch inspection' });
@@ -35,7 +35,7 @@ router.post('/', (req, res) => {
     // TODO: Implement database insert
     res.status(201).json({
       message: 'Inspection created successfully',
-      data: { id: Date.now(), ...inspectionData }
+      data: { id: Date.now(), ...inspectionData },
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create inspection' });
@@ -50,7 +50,7 @@ router.put('/:id', (req, res) => {
     // TODO: Implement database update
     res.json({
       message: `Inspection ${id} updated successfully`,
-      data: { id, ...updateData }
+      data: { id, ...updateData },
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update inspection' });
@@ -63,7 +63,7 @@ router.delete('/:id', (req, res) => {
     const { id } = req.params;
     // TODO: Implement database delete
     res.json({
-      message: `Inspection ${id} deleted successfully`
+      message: `Inspection ${id} deleted successfully`,
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete inspection' });

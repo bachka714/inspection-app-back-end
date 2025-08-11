@@ -7,7 +7,7 @@ router.get('/', (req, res) => {
     // TODO: Implement database query
     res.json({
       message: 'Get all users',
-      data: []
+      data: [],
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -21,7 +21,7 @@ router.get('/:id', (req, res) => {
     // TODO: Implement database query
     res.json({
       message: `Get user ${id}`,
-      data: { id, name: 'John Doe', role: 'inspector' }
+      data: { id, name: 'John Doe', role: 'inspector' },
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch user' });
@@ -35,7 +35,7 @@ router.post('/', (req, res) => {
     // TODO: Implement database insert
     res.status(201).json({
       message: 'User created successfully',
-      data: { id: Date.now(), ...userData }
+      data: { id: Date.now(), ...userData },
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create user' });
@@ -50,7 +50,7 @@ router.put('/:id', (req, res) => {
     // TODO: Implement database update
     res.json({
       message: `User ${id} updated successfully`,
-      data: { id, ...updateData }
+      data: { id, ...updateData },
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update user' });
@@ -63,7 +63,7 @@ router.delete('/:id', (req, res) => {
     const { id } = req.params;
     // TODO: Implement database delete
     res.json({
-      message: `User ${id} deleted successfully`
+      message: `User ${id} deleted successfully`,
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete user' });
