@@ -19,26 +19,26 @@ services:
       - inspection_network
     command: --default-authentication-plugin=mysql_native_password
 
-  app:
-    build: .
-    container_name: inspection_app
-    restart: unless-stopped
-    ports:
-      - '3000:3000'
-    environment:
-      - NODE_ENV=development
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_NAME=inspection_app
-      - DB_USER=inspection_user
-      - DB_PASSWORD=inspection_password
-    depends_on:
-      - mysql
-    networks:
-      - inspection_network
-    volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
+  # app:
+  #   build: .
+  #   container_name: inspection_app
+  #   restart: unless-stopped
+  #   ports:
+  #     - '3000:3000'
+  #   environment:
+  #     - NODE_ENV=development
+  #     - DB_HOST=mysql
+  #     - DB_PORT=3306
+  #     - DB_NAME=inspection_app
+  #     - DB_USER=inspection_user
+  #     - DB_PASSWORD=inspection_password
+  #   depends_on:
+  #     - mysql
+  #   networks:
+  #     - inspection_network
+  #   volumes:
+  #     - .:/usr/src/app
+  #     - /usr/src/app/node_modules
 
 volumes:
   mysql_data:

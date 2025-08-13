@@ -10,7 +10,18 @@
     "test:db": "node test-db-connection.js",
     "test:db:simple": "node simple-connection-test.js",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:seed": "node prisma/seed.js",
+    "db:setup": "node scripts/setup-database.js",
+    "db:reset": "prisma migrate reset --force && npm run prisma:seed",
+    "test:auth": "node scripts/test-auth.js",
+    "test:auth:simple": "node scripts/test-auth-simple.js",
+    "test:auth:complete": "node scripts/test-complete-auth.js",
+    "start:auth": "node start-auth-system.js",
+    "db:init": "node scripts/init-db.js"
   },
   "keywords": [
     "express",
@@ -20,16 +31,23 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^6.13.0",
+    "@prisma/client": "^6.14.0",
+    "axios": "^1.11.0",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "helmet": "^7.1.0",
-    "morgan": "^1.10.0"
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.14.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",
     "prettier": "^3.6.2",
-    "prisma": "^6.13.0"
+    "prisma": "^6.14.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }
