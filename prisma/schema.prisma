@@ -107,6 +107,8 @@ model DeviceModel {
   manufacturer String   @db.VarChar(200)
   model        String   @db.VarChar(200)
   specs        Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations
   devices      Device[]
@@ -338,6 +340,7 @@ enum DeviceStatus {
   IN_STOCK
   INSTALLED
   IN_SERVICE
+  NORMAL
   MAINTENANCE
   DECOMMISSIONED
 }

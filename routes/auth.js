@@ -72,11 +72,7 @@ router.post('/register', async (req, res) => {
       },
       include: {
         organization: true,
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        role: true,
       },
     });
 
@@ -98,7 +94,7 @@ router.post('/register', async (req, res) => {
             name: user.organization.name,
             code: user.organization.code,
           },
-          roles: user.userRoles.map(ur => ur.role.name),
+          role: user.role.name,
         },
         token,
       },
@@ -128,16 +124,12 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Find user with organization and roles
+    // Find user with organization and role
     const user = await prisma.user.findUnique({
       where: { email },
       include: {
         organization: true,
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        role: true,
       },
     });
 
@@ -185,7 +177,7 @@ router.post('/login', async (req, res) => {
             name: user.organization.name,
             code: user.organization.code,
           },
-          roles: user.userRoles.map(ur => ur.role.name),
+          role: user.role.name,
         },
         token,
       },
@@ -226,11 +218,7 @@ router.get('/verify', async (req, res) => {
       where: { id: BigInt(decoded.id) },
       include: {
         organization: true,
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        role: true,
       },
     });
 
@@ -255,7 +243,7 @@ router.get('/verify', async (req, res) => {
             name: user.organization.name,
             code: user.organization.code,
           },
-          roles: user.userRoles.map(ur => ur.role.name),
+          role: user.role.name,
         },
       },
     });

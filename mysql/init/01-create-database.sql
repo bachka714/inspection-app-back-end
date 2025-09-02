@@ -2,28 +2,52 @@
 CREATE DATABASE IF NOT EXISTS inspection_app;
 USE inspection_app;
 
--- Create users table
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(50),
-    last_name VARCHAR(50),
-    role ENUM('admin', 'inspector', 'viewer') DEFAULT 'viewer',
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+-- Create roles table
+CREATE TABLE IF NOT EXISTS roles (
+  id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  name          VARCHAR(64) UNIQUE NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Create organizations table
 CREATE TABLE IF NOT EXISTS organizations (
   id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   name          VARCHAR(200) NOT NULL,
-  code          VARCHAR(64)  NULL,
+  code          VARCHAR(64) NULL UNIQUE,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Create users table
+CREATE TABLE IF NOT EXISTS users (
+  id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  org_id        BIGINT UNSIGNED NOT NULL,
+  role_id       BIGINT UNSIGNED NOT NULL,
+  email         VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  full_name     VARCHAR(200) NOT NULL,
+  phone         VARCHAR(20) NULL,
+  is_active     BOOLEAN DEFAULT TRUE,
+  deleted_at    TIMESTAMP NULL,
   created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_org_code (code)
+  CONSTRAINT fk_users_org FOREIGN KEY (org_id) REFERENCES organizations(id),
+  CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(id),
+  KEY idx_users_org (org_id),
+  KEY idx_users_role (role_id),
+  KEY idx_users_deleted (deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Create system_config table
+CREATE TABLE IF NOT EXISTS system_config (
+  id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  `key`         VARCHAR(100) UNIQUE NOT NULL,
+  value         TEXT NOT NULL,
+  description   VARCHAR(255) NULL,
+  category      VARCHAR(50) NOT NULL,
+  is_active     BOOLEAN DEFAULT TRUE,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_system_config_category (category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Create contracts table
@@ -34,7 +58,7 @@ CREATE TABLE IF NOT EXISTS contracts (
   contract_number VARCHAR(128) NOT NULL,
   start_date      DATE NULL,
   end_date        DATE NULL,
-  metadata        JSON NULL, -- extra fields if needed
+  metadata        JSON NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_contracts_org FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
@@ -58,7 +82,9 @@ CREATE TABLE IF NOT EXISTS device_models (
   id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   manufacturer  VARCHAR(200) NOT NULL,
   model         VARCHAR(200) NOT NULL,
-  specs         JSON NULL, -- e.g., ratings, classes, protocol
+  specs         JSON NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_device_models (manufacturer, model),
   KEY idx_device_models_manu (manufacturer)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -70,12 +96,13 @@ CREATE TABLE IF NOT EXISTS devices (
   site_id        BIGINT UNSIGNED NULL,
   contract_id    BIGINT UNSIGNED NULL,
   model_id       BIGINT UNSIGNED NULL,
-  serial_number  VARCHAR(128) NOT NULL,
+  serial_number  VARCHAR(100) NOT NULL,
   asset_tag      VARCHAR(128) NULL,
-  status         ENUM('in_stock','installed','in_service','maintenance','decommissioned') NOT NULL DEFAULT 'in_stock',
+  status         ENUM('IN_STOCK','INSTALLED','IN_SERVICE','NORMAL','MAINTENANCE','DECOMMISSIONED') NOT NULL DEFAULT 'IN_STOCK',
   installed_at   DATETIME NULL,
   retired_at     DATETIME NULL,
-  metadata       JSON NULL, -- free-form device properties
+  deleted_at     DATETIME NULL,
+  metadata       JSON NULL,
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_devices_org FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
@@ -85,40 +112,76 @@ CREATE TABLE IF NOT EXISTS devices (
   UNIQUE KEY uk_devices_org_serial (org_id, serial_number),
   KEY idx_devices_org (org_id),
   KEY idx_devices_site (site_id),
-  KEY idx_devices_status (status)
+  KEY idx_devices_status (status),
+  KEY idx_devices_contract (contract_id),
+  KEY idx_devices_model (model_id),
+  KEY idx_devices_installed (installed_at),
+  KEY idx_devices_deleted (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Create inspections table (updated version)
+-- Create inspection_templates table
+CREATE TABLE IF NOT EXISTS inspection_templates (
+  id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  name          VARCHAR(255) NOT NULL,
+  type          ENUM('INSPECTION','INSTALLATION','MAINTENANCE','VERIFICATION') NOT NULL,
+  description   TEXT NULL,
+  questions     JSON NOT NULL,
+  is_active     BOOLEAN DEFAULT TRUE,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_inspection_templates_type (type),
+  KEY idx_inspection_templates_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Create inspections table
 CREATE TABLE IF NOT EXISTS inspections (
   id             BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   org_id         BIGINT UNSIGNED NOT NULL,
   device_id      BIGINT UNSIGNED NULL,
   site_id        BIGINT UNSIGNED NULL,
   contract_id    BIGINT UNSIGNED NULL,
-  type           ENUM('inspection','installation','maintenance','verification') NOT NULL,
+  template_id    BIGINT UNSIGNED NULL,
+  type           ENUM('INSPECTION','INSTALLATION','MAINTENANCE','VERIFICATION') NOT NULL,
   title          VARCHAR(255) NOT NULL,
   scheduled_at   DATETIME NULL,
   started_at     DATETIME NULL,
   completed_at   DATETIME NULL,
-  status         ENUM('draft','in_progress','submitted','approved','rejected','canceled') NOT NULL DEFAULT 'draft',
-  progress       INT NULL,
-  assigned_to    BIGINT UNSIGNED NULL, -- user id
+  status         ENUM('DRAFT','IN_PROGRESS','SUBMITTED','APPROVED','REJECTED','CANCELED') NOT NULL DEFAULT 'DRAFT',
+  progress       TINYINT NULL,
+  assigned_to    BIGINT UNSIGNED NULL,
   created_by     BIGINT UNSIGNED NOT NULL,
   updated_by     BIGINT UNSIGNED NULL,
   notes          TEXT NULL,
+  deleted_at     DATETIME NULL,
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_inspections_org FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
   CONSTRAINT fk_inspections_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL,
   CONSTRAINT fk_inspections_site FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE SET NULL,
   CONSTRAINT fk_inspections_contract FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE SET NULL,
+  CONSTRAINT fk_inspections_template FOREIGN KEY (template_id) REFERENCES inspection_templates(id) ON DELETE SET NULL,
   CONSTRAINT fk_inspections_assignee FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_inspections_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT fk_inspections_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
   KEY idx_inspections_org (org_id),
   KEY idx_inspections_status (status),
   KEY idx_inspections_type (type),
-  KEY idx_inspections_assigned (assigned_to)
+  KEY idx_inspections_assigned (assigned_to),
+  KEY idx_inspections_org_status (org_id, status),
+  KEY idx_inspections_org_scheduled (org_id, scheduled_at),
+  KEY idx_inspections_creator_date (created_by, created_at),
+  KEY idx_inspections_device_status (device_id, status),
+  KEY idx_inspections_scheduled (scheduled_at),
+  KEY idx_inspections_completed (completed_at),
+  KEY idx_inspections_deleted (deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Create doc_details table
+CREATE TABLE IF NOT EXISTS doc_details (
+  id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  doc_name      VARCHAR(255) NOT NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Create inspection_answers table
@@ -127,86 +190,70 @@ CREATE TABLE IF NOT EXISTS inspection_answers (
   inspection_id   BIGINT UNSIGNED NOT NULL,
   answers         JSON NOT NULL,
   pdf_id          BIGINT UNSIGNED NULL,
-  answered_by     BIGINT UNSIGNED NULL,     -- user who answered
-  answered_at     DATETIME NULL,            -- when answered
+  answered_by     BIGINT UNSIGNED NULL,
+  answered_at     DATETIME NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_answer_inspection FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE,
-  CONSTRAINT fk_answer_user FOREIGN KEY (answered_by) REFERENCES users(id) ON DELETE SET NULL
-  -- Optional: fk to questions table if you have one
-  -- CONSTRAINT fk_answer_question FOREIGN KEY (question_id) REFERENCES inspection_questions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_inspection_answers_inspection FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE,
+  CONSTRAINT fk_inspection_answers_user FOREIGN KEY (answered_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_inspection_answers_doc FOREIGN KEY (pdf_id) REFERENCES doc_details(id),
+  KEY idx_inspection_answers_user (answered_by),
+  KEY idx_inspection_answers_date (answered_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Create pdf_details table
-CREATE TABLE IF NOT EXISTS pdf_details (
+-- Create attachments table
+CREATE TABLE IF NOT EXISTS attachments (
   id              BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  pdf_name        VARCHAR(255) NOT NULL,
+  inspection_id   BIGINT UNSIGNED NULL,
+  device_id       BIGINT UNSIGNED NULL,
+  filename        VARCHAR(255) NOT NULL,
+  original_name   VARCHAR(255) NOT NULL,
+  mime_type       VARCHAR(100) NOT NULL,
+  size            INT UNSIGNED NOT NULL,
+  uploaded_by     BIGINT UNSIGNED NOT NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  CONSTRAINT fk_attachments_inspection FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE,
+  CONSTRAINT fk_attachments_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+  CONSTRAINT fk_attachments_uploader FOREIGN KEY (uploaded_by) REFERENCES users(id),
+  KEY idx_attachments_inspection (inspection_id),
+  KEY idx_attachments_device (device_id),
+  KEY idx_attachments_uploader (uploaded_by)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Create system_config table
-CREATE TABLE IF NOT EXISTS system_config (
+-- Create inspection_schedules table
+CREATE TABLE IF NOT EXISTS inspection_schedules (
   id              BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  pdf_path        VARCHAR(255) NOT NULL
+  org_id          BIGINT UNSIGNED NOT NULL,
+  device_id       BIGINT UNSIGNED NULL,
+  site_id         BIGINT UNSIGNED NULL,
+  template_id     BIGINT UNSIGNED NULL,
+  frequency       VARCHAR(20) NOT NULL,
+  interval_days   INT NULL,
+  next_due_date   DATETIME NOT NULL,
+  is_active       BOOLEAN DEFAULT TRUE,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_inspection_schedules_org FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  CONSTRAINT fk_inspection_schedules_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL,
+  CONSTRAINT fk_inspection_schedules_site FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE SET NULL,
+  CONSTRAINT fk_inspection_schedules_template FOREIGN KEY (template_id) REFERENCES inspection_templates(id) ON DELETE SET NULL,
+  KEY idx_schedule_due_date (next_due_date),
+  KEY idx_schedule_org (org_id),
+  KEY idx_schedule_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Create inspection_items table (keeping existing for backward compatibility)
-CREATE TABLE IF NOT EXISTS inspection_items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    inspection_id INT NOT NULL,
-    item_name VARCHAR(255) NOT NULL,
-    item_description TEXT,
-    status ENUM('pending', 'passed', 'failed', 'not_applicable') DEFAULT 'pending',
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE
-);
-
--- Insert sample data
-INSERT INTO users (username, email, password_hash, first_name, last_name, role) VALUES
-('admin', 'admin@inspectionapp.com', '$2b$10$example_hash', 'Admin', 'User', 'admin'),
-('inspector1', 'inspector1@inspectionapp.com', '$2b$10$example_hash', 'John', 'Doe', 'inspector'),
-('inspector2', 'inspector2@inspectionapp.com', '$2b$10$example_hash', 'Jane', 'Smith', 'inspector');
-
--- Insert sample organizations
-INSERT INTO organizations (name, code) VALUES
-('Sample Organization', 'SAMPLE_ORG'),
-('Test Company', 'TEST_CO');
-
--- Insert sample contracts
-INSERT INTO contracts (org_id, contract_name, contract_number, start_date, end_date) VALUES
-(1, 'Maintenance Contract 2024', 'MC-2024-001', '2024-01-01', '2024-12-31'),
-(1, 'Service Agreement', 'SA-2024-001', '2024-01-01', '2025-01-01');
-
--- Insert sample sites
-INSERT INTO sites (org_id, name) VALUES
-(1, 'Main Office'),
-(1, 'Warehouse A'),
-(2, 'Branch Office');
-
--- Insert sample device models
-INSERT INTO device_models (manufacturer, model, specs) VALUES
-('Generic Corp', 'Safety Device X1', '{"rating": "Class A", "protocol": "Standard"}'),
-('Tech Industries', 'Monitor Pro', '{"rating": "Class B", "protocol": "Advanced"}');
-
--- Insert sample devices
-INSERT INTO devices (org_id, site_id, contract_id, model_id, serial_number, asset_tag, status) VALUES
-(1, 1, 1, 1, 'SN001', 'AT001', 'in_service'),
-(1, 2, 1, 2, 'SN002', 'AT002', 'installed');
-
--- Insert sample inspections (updated)
-INSERT INTO inspections (org_id, title, type, status, created_by) VALUES
-(1, 'Safety Equipment Check', 'inspection', 'draft', 1),
-(1, 'Fire Safety Inspection', 'inspection', 'in_progress', 2),
-(1, 'Electrical Systems Review', 'maintenance', 'completed', 2);
-
-INSERT INTO inspection_items (inspection_id, item_name, item_description, status) VALUES
-(1, 'Fire Extinguishers', 'Check all fire extinguishers are properly mounted and charged', 'pending'),
-(1, 'Emergency Exits', 'Verify all emergency exits are clear and properly marked', 'pending'),
-(1, 'First Aid Kits', 'Inspect first aid kits for completeness and expiration dates', 'pending'),
-(2, 'Fire Alarms', 'Test all fire alarm systems', 'in_progress'),
-(2, 'Sprinkler Systems', 'Check sprinkler system functionality', 'pending'),
-(3, 'Electrical Panels', 'Inspect electrical panels for proper labeling and condition', 'completed'),
-(3, 'Circuit Breakers', 'Test circuit breaker functionality', 'completed');
+-- Create audit_logs table
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  table_id      VARCHAR(50) NOT NULL,
+  record_id     BIGINT UNSIGNED NOT NULL,
+  action        VARCHAR(20) NOT NULL,
+  old_data      JSON NULL,
+  new_data      JSON NULL,
+  user_id       BIGINT UNSIGNED NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_audit_logs_user FOREIGN KEY (user_id) REFERENCES users(id),
+  KEY idx_audit_log_record (table_id, record_id),
+  KEY idx_audit_log_user (user_id),
+  KEY idx_audit_log_date (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

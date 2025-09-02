@@ -15,11 +15,7 @@ router.get('/', authMiddleware, async (req, res) => {
       },
       include: {
         organization: true,
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        role: true,
       },
     });
 
@@ -37,7 +33,7 @@ router.get('/', authMiddleware, async (req, res) => {
         name: user.organization.name,
         code: user.organization.code,
       },
-      roles: user.userRoles.map(ur => ur.role.name),
+      role: user.role.name,
     }));
 
     res.json({
@@ -63,11 +59,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
       where: { id: BigInt(req.user.id) },
       include: {
         organization: true,
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        role: true,
       },
     });
 
@@ -93,7 +85,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
           name: user.organization.name,
           code: user.organization.code,
         },
-        roles: user.userRoles.map(ur => ur.role.name),
+        role: user.role.name,
       },
     });
   } catch (error) {
@@ -120,11 +112,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       },
       include: {
         organization: true,
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        role: true,
       },
     });
 
@@ -151,7 +139,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
           name: user.organization.name,
           code: user.organization.code,
         },
-        roles: user.userRoles.map(ur => ur.role.name),
+        role: user.role.name,
       },
     });
   } catch (error) {
@@ -203,20 +191,11 @@ router.post('/', authMiddleware, async (req, res) => {
         fullName,
         phone,
         orgId: BigInt(req.user.orgId), // Same organization as creating user
-        userRoles: {
-          create:
-            roleIds && roleIds.length > 0
-              ? roleIds.map(roleId => ({ roleId: BigInt(roleId) }))
-              : [],
-        },
+        roleId: roleIds && roleIds.length > 0 ? BigInt(roleIds[0]) : BigInt(2), // Default to inspector role (id: 2)
       },
       include: {
         organization: true,
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        role: true,
       },
     });
 
@@ -233,7 +212,7 @@ router.post('/', authMiddleware, async (req, res) => {
           name: user.organization.name,
           code: user.organization.code,
         },
-        roles: user.userRoles.map(ur => ur.role.name),
+        role: user.role.name,
       },
     });
   } catch (error) {
@@ -288,11 +267,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       data: updateData,
       include: {
         organization: true,
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
+        role: true,
       },
     });
 
@@ -318,11 +293,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
         where: { id: BigInt(id) },
         include: {
           organization: true,
-          userRoles: {
-            include: {
-              role: true,
-            },
-          },
+          role: true,
         },
       });
 
@@ -339,7 +310,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             name: updatedUser.organization.name,
             code: updatedUser.organization.code,
           },
-          roles: updatedUser.userRoles.map(ur => ur.role.name),
+          role: updatedUser.role.name,
         },
       });
     }
@@ -357,7 +328,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
           name: user.organization.name,
           code: user.organization.code,
         },
-        roles: user.userRoles.map(ur => ur.role.name),
+        role: user.role.name,
       },
     });
   } catch (error) {
